@@ -1,0 +1,13 @@
+node_modules/
+dist/
+.DS_Store
+.impeccable/questions/
+*.log
+
+.data/
+.env
+.env.*
+!.env.example
+backups/
+*.sqlite
+*.sqlite-*

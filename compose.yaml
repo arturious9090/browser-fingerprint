@@ -1,0 +1,104 @@
+name: fingerprint
+services:
+  app:
+    image: fingerprint-app:local
+    build: .
+    restart: unless-stopped
+    init: true
+    network_mode: none
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 64
+    mem_limit: 384m
+    cpus: 1.0
+    stop_grace_period: 15s
+    environment:
+      NODE_ENV: production
+      PUBLIC_ORIGIN: https://${DOMAIN:?Укажите DOMAIN в .env}
+      ADMIN_ORIGIN: http://127.0.0.1:8080
+      DATABASE_PATH: /data/fingerprints.sqlite
+      PROXY_SOCKET: /run/fingerprint/app.sock
+      RETENTION_DAYS: ${RETENTION_DAYS:-30}
+      MAX_REPORTS: ${MAX_REPORTS:-10000}
+      MAX_DATABASE_BYTES: ${MAX_DATABASE_BYTES:-536870912}
+      UPLOADS_PER_HOUR: ${UPLOADS_PER_HOUR:-30}
+      GLOBAL_UPLOADS_PER_HOUR: ${GLOBAL_UPLOADS_PER_HOUR:-1000}
+      REQUESTS_PER_MINUTE: ${REQUESTS_PER_MINUTE:-240}
+    volumes:
+      - app_data:/data
+      - app_socket:/run/fingerprint
+    tmpfs:
+      - /tmp:size=16m,mode=1777,noexec,nosuid
+    logging:
+      driver: json-file
+      options: {max-size: 10m, max-file: '3'}
+  caddy:
+    image: caddy:2-alpine@sha256:d8542f48d34a9cf4e4c11a478865229840e87e4c96ea3f439101f31a5d35f75f
+    restart: unless-stopped
+    depends_on:
+      app: {condition: service_healthy}
+    read_only: true
+    cap_drop: [ALL]
+    cap_add: [NET_BIND_SERVICE]
+    group_add: ['1000']
+    security_opt: [no-new-privileges:true]
+    pids_limit: 128
+    mem_limit: 256m
+    cpus: 1.0
+    environment:
+      DOMAIN: ${DOMAIN:?Укажите DOMAIN в .env}
+      ACME_EMAIL: ${ACME_EMAIL:?Укажите ACME_EMAIL в .env}
+    ports:
+      - 80:80
+      - 443:443
+      - 443:443/udp
+      - 127.0.0.1:8080:8080
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - app_socket:/run/fingerprint:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    tmpfs:
+      - /tmp:size=16m,mode=1777,noexec,nosuid
+    logging:
+      driver: json-file
+      options: {max-size: 10m, max-file: '3'}
+  backup:
+    profiles: [tools]
+    image: fingerprint-app:local
+    entrypoint: [node, scripts/backup.mjs]
+    network_mode: none
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 192m
+    cpus: 1.0
+    pids_limit: 32
+    healthcheck: {disable: true}
+    environment: {DATABASE_PATH: /data/fingerprints.sqlite}
+    volumes:
+      - app_data:/data:ro
+      - backups:/backups
+  maintenance:
+    profiles: [tools]
+    image: fingerprint-app:local
+    command: [node, scripts/rotate-owner.mjs]
+    network_mode: none
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 192m
+    cpus: 1.0
+    pids_limit: 32
+    healthcheck: {disable: true}
+    environment: {DATABASE_PATH: /data/fingerprints.sqlite}
+    volumes:
+      - app_data:/data
+      - backups:/backups:ro
+volumes:
+  app_data:
+  app_socket:
+  backups:
+  caddy_data:
+  caddy_config:

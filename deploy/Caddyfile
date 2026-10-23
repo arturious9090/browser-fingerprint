@@ -1,0 +1,42 @@
+{
+	email {$ACME_EMAIL}
+	admin off
+	servers {
+		max_header_size 16KB
+		timeouts {
+			read_header 10s
+			read_body 30s
+			write 30s
+			idle 30s
+		}
+	}
+}
+
+(app_proxy) {
+	request_body {
+		max_size 2097152
+	}
+	reverse_proxy unix//run/fingerprint/app.sock {
+		header_up Host {args[0]}
+		header_up X-Real-IP {remote_host}
+		header_up X-Forwarded-Proto {args[1]}
+		header_up -Forwarded
+		header_up -CF-*
+		transport http {
+			dial_timeout 3s
+			response_header_timeout 20s
+		}
+	}
+	header -Server
+}
+
+{$DOMAIN} {
+	@private path /admin* /api/admin*
+	respond @private 404
+	import app_proxy {$DOMAIN} https
+}
+
+# Published on VPS loopback only; reach it with an SSH local port forward.
+http://127.0.0.1:8080 {
+	import app_proxy 127.0.0.1:8080 http
+}

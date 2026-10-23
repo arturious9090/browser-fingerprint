@@ -1,0 +1,11 @@
+import {cp,mkdir,writeFile,rm,readFile} from 'node:fs/promises';
+import {fileURLToPath} from 'node:url';
+import path from 'node:path';
+const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
+const dist=path.join(root,'dist');
+await rm(dist,{recursive:true,force:true});await mkdir(path.join(dist,'scripts'),{recursive:true});
+for(const file of ['public','docs','server.mjs','database.mjs','reports.mjs','connection.mjs','security.mjs','audit.mjs','README.md','DEPLOYMENT.md','SECURITY.md','SECURITY-PRACTICES.md','VERIFICATION.md'])await cp(path.join(root,file),path.join(dist,file),{recursive:true});
+for(const file of ['rotate-owner.mjs','healthcheck.mjs','backup.mjs'])await cp(path.join(root,'scripts',file),path.join(dist,'scripts',file));
+const manifest=JSON.parse(await readFile(path.join(root,'package.json'),'utf8'));manifest.scripts={start:'node server.mjs','admin:rotate':'node scripts/rotate-owner.mjs',backup:'node scripts/backup.mjs'};await writeFile(path.join(dist,'package.json'),JSON.stringify(manifest,null,2)+'\n');
+await writeFile(path.join(dist,'.gitignore'),'.data/\n.env\n*.sqlite*\n');
+console.log('Built Node.js + SQLite application in dist/. Database and owner key are excluded.');

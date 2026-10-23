@@ -1,0 +1,17 @@
+**
+!Dockerfile
+!package.json
+!*.mjs
+!public/
+!public/**
+!scripts/
+!scripts/**
+!tests/
+!tests/**
+!README.md
+!DEPLOYMENT.md
+!SECURITY.md
+!SECURITY-PRACTICES.md
+!VERIFICATION.md
+!docs/
+!docs/**
